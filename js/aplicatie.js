@@ -10,6 +10,8 @@ document.addEventListener('show', function (event) {
       console.log("Onsen UI is ready!");
       if (page.matches('#tab1')) {
          navigator.geolocation.getCurrentPosition(succes, eroare);
+          var devid = device.uuid;
+        ons.notification.alert('Device uuid: '+ devid);
 
          function succes(position) {
             centru = {
@@ -74,6 +76,44 @@ document.addEventListener('show', function (event) {
             }
             );
          };
+
+         <?php
+include("conn.php"); // Conectarea la baza de date
+// Am primit urmatorii parametri:
+$cod = $_POST['cod'];
+$idpart = $_POST['idpart'];
+$lat = $_POST['lat'];
+$lng = $_POST['lng'];
+// Caut articolul $cod in tabelul activitati
+$cda = "SELECT * FROM activitati WHERE devid = '$cod'";
+$result = mysqli_query($cnx, $cda);
+$articole = [];
+if (mysqli_num_rows($result) > 0) {
+ // gasit
+ $linie = mysqli_fetch_assoc($result);
+ $idactivi = $linie["id"];
+ // Sterg inregistrarile anterioare din tabelul participanti
+ $cdelete = "DELETE from participanti where idactivi = $idactivi and idpart= '$idpart'";
+ mysqli_query($cnx, $cdelete);
+ // Adaug un articol in participanti
+ $datatimp = date('Y-m-d H:i:s');
+ $cda = "INSERT INTO participanti VALUES (null, $idactivi, '$idpart', $lat,$lng, '$datatimp', 100)"; // 100 e nivelul bateriei.
+ mysqli_query($cnx, $cda);
+ // Caut articolele din participanti care au acelasi $idactivi
+ $cda = "SELECT idpart, lat, lng, baterie FROM participanti WHERE idactivi= '$idactivi'";
+ if ($rez=mysqli_query($cnx,$cda)) {
+ // Se preiau liniile pe rand
+ while ($linie = mysqli_fetch_assoc($rez)) {
+ $articole[] = $linie;
+ }
+ }
+}
+echo json_encode($articole);
+if ($result) {
+ mysqli_free_result($result);
+}
+mysqli_close($cnx);
+?>
 
          document.querySelector("#adauga").onclick = function () {
             var formData = new FormData();
@@ -171,6 +211,31 @@ document.addEventListener('show', function (event) {
                });
             }
          }
+
+              <?php
+include("conn.php"); // Conectare la baza de date
+// Preiau devid din sirul asociativ $_POST
+$devid = MD5($_POST[uid]); 
+// Caut o inregistrare cu acest cod in tabelul activitati.
+$cda = "SELECT * FROM activitati where devid = '$devid'";
+if ($rez=mysqli_query($cnx,$cda)) {
+ // Exista o inregistrare prealabila cu acelasi devid
+ $linie = mysqli_fetch_assoc($rez);
+ $valoareid = $linie['id'];
+// Sterg inregistrarile asociate din tabelul Participanti
+$cdelete = "DELETE from participanti where idactivi = $valoareid";
+mysqli_query($cnx, $cdelete);
+// Sterg inregistrarea din tabelul activitati
+$cdelete1 = "DELETE from activitati where devid = '$devid'";
+mysqli_query($cnx, $cdelete1);
+}
+// Inserez un articol in tabelul activitati
+$datact = date("Y-m-d");
+mysqli_query($cnx,"INSERT INTO activitati VALUES (null,'$devid','$datact')");
+mysqli_close($cnx);
+$rasp = array("codact"=>$devid);
+echo json_encode($rasp);
+?>
 
          //  Declarare activitate noua
          document.querySelector("#decl").onclick = function () {
